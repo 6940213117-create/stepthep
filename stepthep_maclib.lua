@@ -165,7 +165,7 @@ end
 -- ══════════════════════════════════════════════
 
 -- โหลด MacLib library
-local MacLib = loadstring(game:HttpGet("YOUR_MACLIB_URL_HERE"))()
+local MacLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/6940213117-create/stepthep/refs/heads/main/ui.txt"))()
 -- Assumption: ui.txt ถูก host ที่ URL ที่ Sam กำหนด
 -- ถ้าใช้ local: ให้ require / dofile / loadstring แล้วแต่ executor
 
