@@ -646,6 +646,9 @@ startMain = function(authResult)
         KeyInfo  = Window:AddTab({ Title = "Key Info", Icon = "clock"      }),
     }
 
+    -- Shared lifecycle flag for countdown and expiry watcher.
+    local cleanupDone = false
+
     -- ══════════════════════════════════════════════
     --  KEY INFO TAB — realtime KeyAuth expiry countdown
     -- ══════════════════════════════════════════════
@@ -681,7 +684,7 @@ startMain = function(authResult)
         end
 
         task.spawn(function()
-            while true do
+            while not cleanupDone and not Fluent.Unloaded do
                 if expiryUnix then
                     -- KeyAuth expiry is a Unix timestamp; compare with Unix time.
                     local now = os.time()
@@ -1062,7 +1065,6 @@ startMain = function(authResult)
     -- ════════════════════════════════════════════════════════
 
     -- ── fullCleanup: reset + destroy everything injected ────
-    local cleanupDone = false
     local function fullCleanup()
         if cleanupDone then return end
         cleanupDone = true
@@ -1120,68 +1122,108 @@ startMain = function(authResult)
         fullCleanup()
     end)
 
-    -- ── Hook 2: Key Expiry Watcher → fullCleanup() + notify ─
+    -- ── Hook 2: Key Expiry Watcher → close UI + show notice ─
     do
         local watchExpiry = getKeyExpiry(authResult)
+
+        local function showExpiredNotice()
+            pcall(function()
+                local Players = game:GetService("Players")
+                local CoreGui = game:GetService("CoreGui")
+
+                local sg = Instance.new("ScreenGui")
+                sg.Name = "STEPTHEP_KeyExpiredNotice"
+                sg.ResetOnSpawn = false
+                sg.IgnoreGuiInset = true
+                sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+                local parented = false
+                if syn and syn.protect_gui then
+                    pcall(function() syn.protect_gui(sg) end)
+                end
+                local ok = pcall(function()
+                    sg.Parent = CoreGui
+                end)
+                if ok and sg.Parent then
+                    parented = true
+                else
+                    local player = Players.LocalPlayer
+                    local playerGui = player and player:FindFirstChildOfClass("PlayerGui")
+                    if playerGui then
+                        sg.Parent = playerGui
+                        parented = true
+                    end
+                end
+                if not parented then
+                    sg:Destroy()
+                    return
+                end
+
+                local frame = Instance.new("Frame")
+                frame.Name = "Notice"
+                frame.Size = UDim2.new(0.88, 0, 0, 112)
+                frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+                frame.AnchorPoint = Vector2.new(0.5, 0.5)
+                frame.BackgroundColor3 = Color3.fromRGB(20, 20, 24)
+                frame.BorderSizePixel = 0
+                frame.Parent = sg
+                Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+                local stroke = Instance.new("UIStroke")
+                stroke.Color = Color3.fromRGB(235, 75, 75)
+                stroke.Thickness = 1.5
+                stroke.Parent = frame
+
+                local title = Instance.new("TextLabel")
+                title.Size = UDim2.new(1, -24, 0, 34)
+                title.Position = UDim2.fromOffset(12, 12)
+                title.BackgroundTransparency = 1
+                title.TextColor3 = Color3.fromRGB(255, 85, 85)
+                title.TextSize = 17
+                title.Font = Enum.Font.GothamBold
+                title.TextWrapped = true
+                title.TextXAlignment = Enum.TextXAlignment.Left
+                title.Text = "คีย์หมดอายุแล้ว"
+                title.Parent = frame
+
+                local detail = Instance.new("TextLabel")
+                detail.Size = UDim2.new(1, -24, 0, 48)
+                detail.Position = UDim2.fromOffset(12, 52)
+                detail.BackgroundTransparency = 1
+                detail.TextColor3 = Color3.fromRGB(225, 225, 225)
+                detail.TextSize = 13
+                detail.Font = Enum.Font.Gotham
+                detail.TextWrapped = true
+                detail.TextXAlignment = Enum.TextXAlignment.Left
+                detail.TextYAlignment = Enum.TextYAlignment.Top
+                detail.Text = "ระบบปิดหน้าต่างและหยุดฟีเจอร์ทั้งหมดแล้ว กรุณาใส่คีย์ที่ยังใช้งานได้"
+                detail.Parent = frame
+
+                task.delay(8, function()
+                    pcall(function() sg:Destroy() end)
+                end)
+            end)
+        end
 
         if watchExpiry then
             task.spawn(function()
                 while not cleanupDone do
-                    task.wait(5)
-                    local now = os.time()
-                    if now >= watchExpiry then
-                        -- เรียก cleanup ทันที
+                    if os.time() >= watchExpiry then
+                        -- Stop features and close the main UI first.
                         fullCleanup()
-
-                        -- แสดง notice ให้ผู้ใช้รัน script ใหม่
-                        task.wait(0.3)
-                        pcall(function()
-                            local sg = Instance.new("ScreenGui")
-                            sg.ResetOnSpawn = false
-                            sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                            if syn and syn.protect_gui then syn.protect_gui(sg) end
-                            sg.Parent = game:GetService("CoreGui")
-
-                            local frame = Instance.new("Frame", sg)
-                            frame.Size          = UDim2.fromOffset(400, 90)
-                            frame.Position      = UDim2.new(0.5, -200, 0.5, -45)
-                            frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-                            frame.BorderSizePixel  = 0
-                            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-                            Instance.new("UIStroke", frame).Thickness = 1
-
-                            local title = Instance.new("TextLabel", frame)
-                            title.Size               = UDim2.new(1, -20, 0, 28)
-                            title.Position           = UDim2.fromOffset(10, 8)
-                            title.BackgroundTransparency = 1
-                            title.TextColor3         = Color3.fromRGB(255, 70, 70)
-                            title.TextSize           = 15
-                            title.Font               = Enum.Font.GothamSemiBold
-                            title.TextXAlignment     = Enum.TextXAlignment.Left
-                            title.Text               = "⚠  License หมดอายุแล้ว — กรุณารัน script ใหม่เพื่อเข้าสู่หน้าใส่ Key"
-
-                            local sub2 = Instance.new("TextLabel", frame)
-                            sub2.Size                = UDim2.new(1, -20, 0, 22)
-                            sub2.Position            = UDim2.fromOffset(10, 44)
-                            sub2.BackgroundTransparency = 1
-                            sub2.TextColor3          = Color3.fromRGB(150, 150, 150)
-                            sub2.TextSize            = 12
-                            sub2.Font                = Enum.Font.Gotham
-                            sub2.TextXAlignment      = Enum.TextXAlignment.Left
-                            sub2.Text                = "ระบบได้ปิด ESP, Aimbot และคืนค่า offset ทุกอย่างแล้ว"
-
-                            -- auto-dismiss หลัง 10 วินาที
-                            task.delay(10, function()
-                                pcall(function() sg:Destroy() end)
-                            end)
-                        end)
-
+                        task.wait(0.2)
+                        showExpiredNotice()
                         break
                     end
+                    task.wait(1)
                 end
             end)
+        else
+            warn("[ STEPTHEP ] KeyAuth expiry timestamp missing; expiry auto-close is disabled.")
         end
     end
+    -- ════════════════════════════════════════════════════════
+    print("[ STEPTHEP v1.1 ] loaded — INSERT=menu | ALT=mouse(ตลอด) | E=lock")
     -- ════════════════════════════════════════════════════════
     print("[ STEPTHEP v1.1 ] loaded — INSERT=menu | ALT=mouse(ตลอด) | E=lock")
 end
