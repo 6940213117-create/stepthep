@@ -121,7 +121,7 @@ local function setAimbotMBEnabled(enabled)
             if cam and target then
                 cam.CFrame = cam.CFrame:Lerp(
                     CFrame.new(cam.CFrame.Position, target.Position),
-                    0.70
+                    0.25
                 )
             end
         end)
@@ -611,6 +611,26 @@ LoginWindow:SelectTab(1)
 Fluent:Notify({Title="STEPTHEP", Content=authStatus, Duration=5})
 
 startMain = function(authResult)
+    -- Read KeyAuth subscriptions from either documented response location.
+    -- KeyAuth user data is commonly nested under authResult.info.
+    local function getKeyExpiry(result)
+        if type(result) ~= "table" then return nil end
+
+        local info = type(result.info) == "table" and result.info or nil
+        local subscriptions = info and info.subscriptions or result.subscriptions
+        if type(subscriptions) ~= "table" then return nil end
+
+        local latestExpiry = nil
+        for _, sub in ipairs(subscriptions) do
+            if type(sub) == "table" then
+                local exp = tonumber(sub.expiry)
+                if exp and exp > 0 and (not latestExpiry or exp > latestExpiry) then
+                    latestExpiry = exp
+                end
+            end
+        end
+        return latestExpiry
+    end
     -- Remove the License tab so it doesn't show after auth
     pcall(function()
         LoginTab.Frame:Destroy()
@@ -633,18 +653,8 @@ startMain = function(authResult)
         local function addSection(tab, title) tab:AddSection(title) end
         addSection(Tabs.KeyInfo, "LICENSE STATUS")
 
-        -- Pull expiry unix timestamp from authResult.subscriptions
-        local expiryUnix = nil
-        if type(authResult) == "table" and type(authResult.subscriptions) == "table" then
-            for _, sub in ipairs(authResult.subscriptions) do
-                local exp = tonumber(sub.expiry)
-                if exp and exp > 0 then
-                    if not expiryUnix or exp > expiryUnix then
-                        expiryUnix = exp
-                    end
-                end
-            end
-        end
+        -- Pull expiry Unix timestamp from KeyAuth user data.
+        local expiryUnix = getKeyExpiry(authResult)
 
         -- Username / key label
         local username = "—"
@@ -673,8 +683,8 @@ startMain = function(authResult)
         task.spawn(function()
             while true do
                 if expiryUnix then
-                    -- os.time() not available in Roblox executor; use tick() as Unix approx
-                    local now = math.floor(tick())
+                    -- KeyAuth expiry is a Unix timestamp; compare with Unix time.
+                    local now = os.time()
                     local remaining = expiryUnix - now
                     local formatted = formatCountdown(remaining)
                     pcall(function() timerWidget:SetDesc(formatted) end)
@@ -1112,23 +1122,13 @@ startMain = function(authResult)
 
     -- ── Hook 2: Key Expiry Watcher → fullCleanup() + notify ─
     do
-        local watchExpiry = nil
-        if type(authResult) == "table" and type(authResult.subscriptions) == "table" then
-            for _, sub in ipairs(authResult.subscriptions) do
-                local exp = tonumber(sub.expiry)
-                if exp and exp > 0 then
-                    if not watchExpiry or exp > watchExpiry then
-                        watchExpiry = exp
-                    end
-                end
-            end
-        end
+        local watchExpiry = getKeyExpiry(authResult)
 
         if watchExpiry then
             task.spawn(function()
                 while not cleanupDone do
                     task.wait(5)
-                    local now = math.floor(tick())
+                    local now = os.time()
                     if now >= watchExpiry then
                         -- เรียก cleanup ทันที
                         fullCleanup()
