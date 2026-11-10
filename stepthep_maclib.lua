@@ -724,11 +724,6 @@ startMain = function(authResult)
         Default = CFG.ESP_DISTANCE_COLOR,
         Callback = function(v) CFG.ESP_DISTANCE_COLOR = v end
     })
-    Tabs.ESP:AddColorPicker("SkeletonColor", {
-        Title = "Skeleton Color",
-        Default = CFG.SKE_COLOR,
-        Callback = function(v) CFG.SKE_COLOR = v end
-    })
     Tabs.ESP:AddSlider("ESPMaxDistance", {
         Title = "ESP Max Distance",
         Description = "ระยะสูงสุดที่แสดง ESP (studs)",
