@@ -1196,7 +1196,7 @@ startMain = function(authResult)
                 detail.TextWrapped = true
                 detail.TextXAlignment = Enum.TextXAlignment.Left
                 detail.TextYAlignment = Enum.TextYAlignment.Top
-                detail.Text = "ระบบปิดหน้าต่างและหยุดฟีเจอร์ทั้งหมดแล้ว กรุณาใส่คีย์ที่ยังใช้งานได้"
+                detail.Text = "คีย์ของท่านหมดอายุการใช้งานแล้ว กรุณาติดต่อ dc : davstepthep เพื่อต่ออายุคีย์"
                 detail.Parent = frame
 
                 task.delay(8, function()
