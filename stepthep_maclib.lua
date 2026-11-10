@@ -59,6 +59,33 @@ local lockedTarget  = nil
 local aimActive     = false
 local uiVisible     = true
 local mouseUnlocked = false
+local touchLocking = false
+
+local fireZone = {
+    xMin = 0.82, xMax = 0.93,
+    yMin = 0.42, yMax = 0.60,
+}
+
+local function isFireTouch(pos)
+    local vp  = Camera.ViewportSize
+    local nx  = pos.X / vp.X
+    local ny  = pos.Y / vp.Y
+    return nx >= fireZone.xMin and nx <= fireZone.xMax
+       and ny >= fireZone.yMin and ny <= fireZone.yMax
+end
+
+UserInputSvc.TouchStarted:Connect(function(touch, _processed)
+    if isFireTouch(touch.Position) then
+        touchLocking = true
+    end
+end)
+
+UserInputSvc.TouchEnded:Connect(function(touch, _processed)
+    if isFireTouch(touch.Position) then
+        touchLocking = false
+        lockedTarget = nil
+    end
+end)
 
 local BONE_PAIRS = {
     {"Head","UpperTorso"},  {"Head","Torso"},
@@ -87,28 +114,6 @@ local function lockMouse()
     UserInputSvc.MouseIconEnabled = false
     mouseUnlocked = false
 end
-
--- ══════════════════════════════════════════════
---  TOUCH FIRE-ZONE AIMBOT TRIGGER
---  กระสุน icon มุมขวา (~82-93% x, ~42-60% y)
---  TouchStarted/Ended บน zone นี้ set aimActive
---  โดยตรง — doAimbot() อ่าน aimActive เหมือนเดิม
--- ══════════════════════════════════════════════
-local fireZone = {
-    xMin = 0.82,
-    xMax = 0.93,
-    yMin = 0.42,
-    yMax = 0.60,
-}
-
-local function isFireTouch(pos)
-    local vp = Camera.ViewportSize
-    local nx = pos.X / vp.X
-    local ny = pos.Y / vp.Y
-    return nx >= fireZone.xMin and nx <= fireZone.xMax
-       and ny >= fireZone.yMin and ny <= fireZone.yMax
-end
-
 
 -- ══════════════════════════════════════════════
 --  DRAWING HELPERS
@@ -1046,7 +1051,7 @@ startMain = function(authResult)
     end
 
     local function doAimbot()
-        if not CFG.AIM_ENABLED or not aimActive then
+            if not CFG.AIM_ENABLED or (not aimActive and not touchLocking) then
             lockedTarget = nil return
         end
         if lockedTarget then
@@ -1159,31 +1164,6 @@ startMain = function(authResult)
         end
     end)
 
-
-    -- ══════════════════════════════════════════════
-    --  TOUCH FIRE-ZONE HANDLERS
-    --  แตะ fireZone → aimActive = true (เหมือนกด E)
-    --  ปล่อย fireZone → aimActive = false
-    --  fireTouchId ติดตาม touch object ป้องกัน
-    --  multi-touch race reset lock ก่อนเวลา
-    -- ══════════════════════════════════════════════
-    local fireTouchId = nil
-
-    UserInputSvc.TouchStarted:Connect(function(touch, processed)
-        if isFireTouch(touch.Position) then
-            fireTouchId = touch
-            aimActive = true
-        end
-    end)
-
-    UserInputSvc.TouchEnded:Connect(function(touch, processed)
-        if touch == fireTouchId then
-            fireTouchId = nil
-            aimActive = false
-            lockedTarget = nil
-        end
-    end)
-
     -- ══════════════════════════════════════════════
     --  MAIN LOOP
     -- ══════════════════════════════════════════════
@@ -1221,6 +1201,7 @@ startMain = function(authResult)
 
         -- ล้าง aimbot state
         aimActive    = false
+        touchLocking = false   -- เพิ่มหลัง aimActive = false ใน fullCleanup()
         lockedTarget = nil
 
         -- ลบ ESP + Skeleton Drawing ทั้งหมด
