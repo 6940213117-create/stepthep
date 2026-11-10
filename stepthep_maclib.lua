@@ -121,7 +121,7 @@ local function setAimbotMBEnabled(enabled)
             if cam and target then
                 cam.CFrame = cam.CFrame:Lerp(
                     CFrame.new(cam.CFrame.Position, target.Position),
-                    0.25
+                    0.70
                 )
             end
         end)
