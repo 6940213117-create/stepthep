@@ -363,8 +363,8 @@ end)()
 -- ══════════════════════════════════════════════
 local HttpService = game:GetService("HttpService")
 local KEYAUTH = {
-    Name = "STEPTHEP",
-    OwnerID = "dAKrb9vtDL",
+    Name = "stepthep",
+    OwnerID = "1eujoodrU6",
     Version = "1.0",
     API = "https://keyauth.win/api/1.1/"
 }
